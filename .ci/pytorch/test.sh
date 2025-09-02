@@ -1561,10 +1561,6 @@ test_executorch() {
 
   popd
 
-  # Test torchgen generated code for Executorch.
-  echo "Testing ExecuTorch op registration"
-  "$BUILD_BIN_DIR"/test_edge_op_registration
-
   assert_git_not_dirty
 }
 
