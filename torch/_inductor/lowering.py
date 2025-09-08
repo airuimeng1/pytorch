@@ -1235,6 +1235,10 @@ def slice_(x, dim=0, start=0, end=2**63, step=1, clamp=True):
             ir.SliceView.create(x.data, dim, start, end, step, clamp=clamp)
         )  # go to SliceView/ReinterpretView
 
+    # realize to get strides/storage offset
+    if x.maybe_get_layout() is None:
+        x.realize()
+
     # handle size
     assert sym_size is not None
     b_size = ir.DynamicSliceSize(
@@ -1251,9 +1255,7 @@ def slice_(x, dim=0, start=0, end=2**63, step=1, clamp=True):
     # handle storage offset
     if sym_storage is None:
         start_index = compute_slice_index(start, size, 0)
-        new_storage_offset = None
-        if (layout := x.maybe_get_layout()) is not None:
-            new_storage_offset = layout.offset + start_index * x.get_stride()[dim]
+        new_storage_offset = x.get_layout().offset + start_index * x.get_stride()[dim]
     else:
         assert sym_storage is not None
         b_storage = ir.DynamicSelectStorageOffset(
