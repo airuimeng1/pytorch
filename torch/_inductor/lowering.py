@@ -1218,19 +1218,20 @@ def slice_(x, dim=0, start=0, end=2**63, step=1, clamp=True):
             return 0
         return None
 
-    unbacked_bindings = resolve_unbacked_bindings(
-        V.graph.sizevars.shape_env, V.graph.current_node.meta.get("unbacked_bindings", {})
-    )
+    if V.graph.current_node is not None:
+        unbacked_bindings = resolve_unbacked_bindings(
+            V.graph.sizevars.shape_env, V.graph.current_node.meta.get("unbacked_bindings", {})
+        )
 
-    assert len(unbacked_bindings) <= 2, unbacked_bindings
-    sym_size, sym_storage = None, None
-    for sym, keypath in unbacked_bindings.items():
-        if keypath == (CallMethodKey("size"), pytree.SequenceKey(dim)):
-            sym_size = sym
-        elif keypath == (CallMethodKey("storage_offset"),):
-            sym_storage = sym
+        assert len(unbacked_bindings) <= 2, unbacked_bindings
+        sym_size, sym_storage = None, None
+        for sym, keypath in unbacked_bindings.items():
+            if keypath == (CallMethodKey("size"), pytree.SequenceKey(dim)):
+                sym_size = sym
+            elif keypath == (CallMethodKey("storage_offset"),):
+                sym_storage = sym
 
-    if not clamp or (sym_size is None and sym_storage is None):
+    if V.graph.current_node is None or not clamp or (sym_size is None and sym_storage is None):
         return TensorBox(
             ir.SliceView.create(x.data, dim, start, end, step, clamp=clamp)
         )  # go to SliceView/ReinterpretView
