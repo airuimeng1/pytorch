@@ -3440,6 +3440,7 @@ class SliceView(View):
             if val is None:
                 # TODO(rec): can this really happen?
                 return default
+            val = cls.handle_negative_index(val, dim_size)
             return clamp(val, lower, upper)
 
         start = clamp_wrap(start, 0, dim_size, 0)

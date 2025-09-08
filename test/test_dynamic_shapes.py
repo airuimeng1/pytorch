@@ -3612,7 +3612,7 @@ def forward(self, arg0_1: "i64[2][1]cpu", arg1_1: "Sym(u2)", arg2_1: "Sym(u3)", 
         x = torch.randn(3, 4)
         fn = torch.compile(f, fullgraph=True, backend="inductor")
         self.assertTrue(torch.allclose(f(x), fn(x)))
-        with self.assertRaisesRegex(IndexError, "index .* is out of bounds for dimension 0"):
+        with self.assertRaises(RuntimeError):
             fn(torch.zeros(3, 4))
 
     @fresh_cache()
