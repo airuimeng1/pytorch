@@ -3117,6 +3117,7 @@ def foreach(triton_meta, filename=None, inductor_meta=None):
         filename=filename,
     )
 
+
 @dataclasses.dataclass
 class GridExpr:
     """Generate code for grid size expressions in launcher"""
