@@ -182,14 +182,18 @@ def skip_if_odd_worldsize(func):
 
 
 def require_n_gpus_for_nccl_backend(n, backend):
-    return skip_if_lt_x_gpu(n) if backend == "nccl" else unittest.skipIf(False, None)
+    return (
+        skip_if_lt_x_gpu(n)
+        if backend == "nccl"
+        else unittest.skipIf(False, TEST_SKIPS[f"multi-gpu-{n}"].message)
+    )
 
 
 def import_transformers_or_skip():
     try:
         from transformers import AutoModelForMaskedLM, BertConfig  # noqa: F401
 
-        return unittest.skipIf(False)
+        return unittest.skipIf(False, "Dummy")
     except ImportError:
         return unittest.skip(TEST_SKIPS["importerror"].message)
 
