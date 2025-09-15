@@ -13,7 +13,8 @@ from typing import Any, Callable, Optional
 import torch
 import torch.fx
 from torch._dynamo.graph_utils import _graph_uses_non_cpu
-from torch._dynamo.precompile_context import PrecompileContext, SystemInfo
+from torch._dynamo.package import SystemInfo
+from torch._dynamo.precompile_context import PrecompileContext
 
 from . import convert_frame
 from .hooks import Hooks
