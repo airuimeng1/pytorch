@@ -768,6 +768,16 @@ Export Path
     export
     generated/exportdb/index
 
+Export Functions
+~~~~~~~~~~~~~~~~
+.. autosummary::
+    :toctree: generated
+    :nosignatures:
+
+    export.get_tensor_name
+    export.name
+    export.set_tensor_name
+
 Control Flow
 ------------
 

@@ -8,6 +8,7 @@ from torch._export.verifier import SpecViolationError
 from torch._guards import detect_fake_mode
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import unset_fake_temporarily
+from torch.export import get_tensor_name
 from torch.export.exported_program import (
     ArgumentSpec,
     CustomObjArgument,
@@ -274,17 +275,35 @@ def lift_constants_pass(
                     with unset_fake_temporarily():
                         constant_val = constant_val.data
                 constant_kind = InputKind.CONSTANT_TENSOR
-                constant_fqn = _get_first_fqn(constant_attrs, constant_val)
-                if constant_fqn is not None:
-                    constant_name = constant_fqn.replace(".", "_")
-                else:
-                    constant_name = f"lifted_tensor_{num_tensor_constants}"
+
+                # First check if the tensor has a custom name set via our naming API
+                custom_name = get_tensor_name(constant_val)
+                if custom_name is not None:
+                    constant_name = custom_name
                     constant_fqn = get_constant_fqn(node, constant_name)
+                    # Ensure uniqueness if custom name conflicts
+                    original_name = constant_name
+                    counter = 1
                     while constant_fqn in used_target_names:
-                        num_tensor_constants += 1
+                        constant_name = f"{original_name}_{counter}"
+                        constant_fqn = get_constant_fqn(node, constant_name)
+                        counter += 1
+                    # Mark this name as used to prevent future conflicts
+                    used_target_names.add(constant_fqn)
+                else:
+                    # Fall back to module attribute name if available
+                    constant_fqn = _get_first_fqn(constant_attrs, constant_val)
+                    if constant_fqn is not None:
+                        constant_name = constant_fqn.replace(".", "_")
+                    else:
+                        # Use default naming as last resort
                         constant_name = f"lifted_tensor_{num_tensor_constants}"
                         constant_fqn = get_constant_fqn(node, constant_name)
-                    num_tensor_constants += 1
+                        while constant_fqn in used_target_names:
+                            num_tensor_constants += 1
+                            constant_name = f"lifted_tensor_{num_tensor_constants}"
+                            constant_fqn = get_constant_fqn(node, constant_name)
+                        num_tensor_constants += 1
             else:
                 raise SpecViolationError(
                     f"getattr node {node} referencing unsupported type {type(constant_val)}"
@@ -352,11 +371,14 @@ def lift_constants_pass(
                         target=constant_fqn,
                     ),
                 )
+                # Store the constant with our custom name
+                all_constants[constant_fqn] = constant_val
+
+                # Also store with original module attribute names if they exist
+                # This ensures compatibility with other parts of the export system
                 if constant_val in constant_attrs:
                     for fqn in constant_attrs[constant_val]:
                         all_constants[fqn] = constant_val
-                else:
-                    all_constants[constant_fqn] = constant_val
                 first_user_input_loc += 1
 
     for spec in graph_signature.output_specs:

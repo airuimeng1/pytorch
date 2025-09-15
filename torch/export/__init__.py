@@ -26,11 +26,14 @@ __all__ = [
     "ExportedProgram",
     "ExportGraphSignature",
     "FlatArgsAdapter",
+    "get_tensor_name",
     "load",
     "ModuleCallEntry",
     "ModuleCallSignature",
+    "name",
     "register_dataclass",
     "save",
+    "set_tensor_name",
     "ShapesCollection",
     "unflatten",
     "UnflattenedModule",
@@ -52,6 +55,76 @@ from .unflatten import FlatArgsAdapter, unflatten, UnflattenedModule
 
 
 PassType = Callable[[torch.fx.GraphModule], Optional[PassResult]]
+
+
+# Tensor naming utilities for torch export
+def set_tensor_name(tensor: torch.Tensor, name: str) -> torch.Tensor:
+    """
+    Associates a custom name with a tensor for torch export.
+
+    When the tensor is lifted during torch export, it will use the custom name
+    instead of the auto-generated name like "lifted_tensor_{N}".
+
+    Args:
+        tensor: The tensor to name
+        name: The custom name to associate with the tensor
+
+    Returns:
+        The same tensor (for chaining)
+
+    Example:
+        >>> key = torch.tensor([1, 2, 3])
+        >>> torch.export.set_tensor_name(key, "my_key_tensor")
+        >>> # When exported, this will be named "my_key_tensor" instead of "lifted_tensor_0"
+    """
+    if not isinstance(tensor, torch.Tensor):
+        raise TypeError(f"Expected torch.Tensor, got {type(tensor)}")
+    if not isinstance(name, str):
+        raise TypeError(f"Expected str for name, got {type(name)}")
+    if not name:
+        raise ValueError("Name cannot be empty")
+
+    # Validate name contains only valid characters for FQNs
+    if not all(c.isalnum() or c in "_." for c in name):
+        raise ValueError(
+            f"Name '{name}' contains invalid characters. Only alphanumeric, underscore, and dot are allowed."
+        )
+
+    # Store the name as a custom attribute on the tensor itself
+    # This survives tensor transformations better than WeakKeyDictionary
+    tensor._export_name = name  # type: ignore[attr-defined]
+    return tensor
+
+
+def name(tensor: torch.Tensor, custom_name: str) -> torch.Tensor:
+    """
+    Convenience function to name a tensor. Alias for set_tensor_name.
+
+    Args:
+        tensor: The tensor to name
+        custom_name: The custom name to associate with the tensor
+
+    Returns:
+        The same tensor (for chaining)
+
+    Example:
+        >>> key = torch.export.name(torch.tensor([1, 2, 3]), "my_key")
+    """
+    return set_tensor_name(tensor, custom_name)
+
+
+def get_tensor_name(tensor: torch.Tensor) -> Optional[str]:
+    """
+    Get the custom name associated with a tensor.
+
+    Args:
+        tensor: The tensor to get the name for
+
+    Returns:
+        The custom name if set, None otherwise
+    """
+    return getattr(tensor, "_export_name", None)
+
 
 log: logging.Logger = logging.getLogger(__name__)
 
