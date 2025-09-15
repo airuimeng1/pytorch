@@ -95,13 +95,29 @@ class TestTorchDlPack(TestCase):
 
     @skipMeta
     @onlyCUDA
-    @dtypes(*all_types_and_complex_and(torch.half, torch.bfloat16, torch.bool))
+    @dtypes(
+        *all_types_and_complex_and(
+            torch.half,
+            torch.bfloat16,
+            torch.bool,
+            torch.float8_e5m2,
+            torch.float8_e5m2fnuz,
+            torch.float8_e4m3fn,
+            torch.float8_e4m3fnuz,
+            torch.float8_e8m0fnu,
+            torch.float4_e2m1fn_x2,
+        )
+    )
     def test_dlpack_conversion_with_streams(self, device, dtype):
         # Create a stream where the tensor will reside
         stream = torch.cuda.Stream()
         with torch.cuda.stream(stream):
             # Do an operation in the actual stream
-            x = make_tensor((5,), dtype=dtype, device=device) + 1
+            if dtype == torch.float4_e2m1fn_x2:
+                x = make_tensor((5,), dtype=torch.uint8, device=device) + 1
+                x = x.view(torch.float4_e2m1fn_x2)
+            else:
+                x = make_tensor((5,), dtype=dtype, device=device) + 1
         # DLPack protocol helps establish a correct stream order
         # (hence data dependency) at the exchange boundary.
         # DLPack manages this synchronization for us, so we don't need to
@@ -172,7 +188,19 @@ class TestTorchDlPack(TestCase):
 
     @skipMeta
     @onlyCUDA
-    @dtypes(*all_types_and_complex_and(torch.half, torch.bfloat16, torch.bool))
+    @dtypes(
+        *all_types_and_complex_and(
+            torch.half,
+            torch.bfloat16,
+            torch.bool,
+            torch.float8_e5m2,
+            torch.float8_e5m2fnuz,
+            torch.float8_e4m3fn,
+            torch.float8_e4m3fnuz,
+            torch.float8_e8m0fnu,
+            torch.float4_e2m1fn_x2,
+        )
+    )
     def test_dlpack_conversion_with_diff_streams(self, device, dtype):
         stream_a = torch.cuda.Stream()
         stream_b = torch.cuda.Stream()
@@ -181,7 +209,11 @@ class TestTorchDlPack(TestCase):
         # the `tensor.__dlpack__` method will insert a synchronization event
         # in the current stream to make sure that it was correctly populated.
         with torch.cuda.stream(stream_a):
-            x = make_tensor((5,), dtype=dtype, device=device) + 1
+            if dtype == torch.float4_e2m1fn_x2:
+                x = make_tensor((5,), dtype=torch.uint8, device=device) + 1
+                x = x.view(torch.float4_e2m1fn_x2)
+            else:
+                x = make_tensor((5,), dtype=dtype, device=device) + 1
             z = torch.from_dlpack(x.__dlpack__(stream=stream_b.cuda_stream))
             stream_a.synchronize()
         stream_b.synchronize()
@@ -484,9 +516,7 @@ class TestTorchDlPack(TestCase):
     @skipMeta
     @onlyCPU
     def test_dlpack_unsupported_dtype_error(self, device):
-        inp = make_tensor((5,), dtype=torch.float32, device=device).to(
-            torch.float8_e4m3fn
-        )
+        inp = torch.quantize_per_tensor(torch.randn(()), 0.1, 10, torch.qint8)
 
         with self.assertRaisesRegex(
             BufferError, ".* types are not supported by dlpack"
